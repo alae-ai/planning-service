@@ -4,9 +4,12 @@ import com.planning.microplanning.model.Creneau;
 import com.planning.microplanning.repository.CreneauRepository;
 import com.planning.microplanning.web.error.CreneauNotFoundException;
 import com.planning.microplanning.web.error.CreneauStateException;
+import com.planning.microplanning.web.error.ExternalServiceUnavailableException;
 import com.planning.microplanning.web.error.MedecinNotFoundException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -16,9 +19,14 @@ public class CreneauServiceImpl implements CreneauService {
     private static final Sort CRENEAU_SORT = Sort.by(Sort.Direction.ASC, "date", "heureDebut");
 
     private final CreneauRepository creneauRepository;
+    private final boolean simulateMedecinServiceDown;
 
-    public CreneauServiceImpl(CreneauRepository creneauRepository) {
+    public CreneauServiceImpl(
+            CreneauRepository creneauRepository,
+            @Value("${planning.simulate.medecin-service.down:false}") boolean simulateMedecinServiceDown
+    ) {
         this.creneauRepository = creneauRepository;
+        this.simulateMedecinServiceDown = simulateMedecinServiceDown;
     }
 
     @Override
@@ -54,32 +62,81 @@ public class CreneauServiceImpl implements CreneauService {
     }
 
     @Override
+    @Transactional
     public Creneau bloquer(Long id) {
+        if (id == null) {
+            throw new IllegalArgumentException("id must not be null");
+        }
+
+        // Consistency checks (business rules)
         Creneau c = creneauRepository.findById(id).orElseThrow(() -> new CreneauNotFoundException(id));
         if (!c.isDisponible()) {
-            throw new CreneauStateException("Cannot block an already blocked slot (id=" + id + ").");
+            throw new CreneauStateException("Creneau is already blocked (id=" + id + ").");
         }
         if (!checkMedecinExists(c.getMedecinId())) {
             throw new MedecinNotFoundException(c.getMedecinId());
         }
-        c.setDisponible(false);
-        return creneauRepository.save(c);
+
+        // Atomic transition (handles concurrent requests safely)
+        int updated = creneauRepository.bloquerIfDisponible(id);
+        if (updated == 0) {
+            Creneau now = creneauRepository.findById(id).orElseThrow(() -> new CreneauNotFoundException(id));
+            if (!now.isDisponible()) {
+                throw new CreneauStateException("Creneau is already blocked (id=" + id + ").");
+            }
+            throw new CreneauStateException("Cannot block creneau due to a concurrent update (id=" + id + ").");
+        }
+
+        return creneauRepository.findById(id).orElseThrow(() -> new CreneauNotFoundException(id));
     }
 
     @Override
+    @Transactional
     public Creneau liberer(Long id) {
+        if (id == null) {
+            throw new IllegalArgumentException("id must not be null");
+        }
+
+        // Consistency checks (business rules)
         Creneau c = creneauRepository.findById(id).orElseThrow(() -> new CreneauNotFoundException(id));
         if (c.isDisponible()) {
-            throw new CreneauStateException("Cannot free an already available slot (id=" + id + ").");
+            throw new CreneauStateException("Creneau is already available (id=" + id + ").");
         }
-        c.setDisponible(true);
-        return creneauRepository.save(c);
+
+        // Atomic transition (handles concurrent requests safely)
+        int updated = creneauRepository.libererIfBloque(id);
+        if (updated == 0) {
+            Creneau now = creneauRepository.findById(id).orElseThrow(() -> new CreneauNotFoundException(id));
+            if (now.isDisponible()) {
+                throw new CreneauStateException("Creneau is already available (id=" + id + ").");
+            }
+            throw new CreneauStateException("Cannot free creneau due to a concurrent update (id=" + id + ").");
+        }
+
+        return creneauRepository.findById(id).orElseThrow(() -> new CreneauNotFoundException(id));
     }
 
+    /**
+     * Academic TP-friendly "resilience" implementation:
+     * simulate an external dependency (medecin-service) directly in the service layer.
+     *
+     * - Normal mode: returns true (dependency assumed available and doctor exists).
+     * - Failure mode (planning.simulate.medecin-service.down=true): throws a controlled 503 business exception.
+     */
     private boolean checkMedecinExists(Long medecinId) {
-        // TODO: Future integration with medecin-service: GET http://localhost:8082/medecins/{id}
-        // Stub: always true for now
-        return true;
+        if (medecinId == null) {
+            return false;
+        }
+        try {
+            if (simulateMedecinServiceDown) {
+                // Simulate: external service down / timeout / connection refused.
+                throw new RuntimeException("Simulated medecin-service failure");
+            }
+
+            // Simulate: doctor exists (no real HTTP call in this academic version).
+            return true;
+        } catch (RuntimeException ex) {
+            throw new ExternalServiceUnavailableException("medecin-service", ex);
+        }
     }
 }
-
