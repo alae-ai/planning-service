@@ -27,13 +27,16 @@ public class CreneauServiceImpl implements CreneauService {
     private static final int DEFAULT_DUREE_MINUTES = 30;
 
     private final CreneauRepository creneauRepository;
+    private final String medecinServiceUrl;
     private final boolean simulateMedecinServiceDown;
 
     public CreneauServiceImpl(
             CreneauRepository creneauRepository,
+            @Value("${service.medecin.url}") String medecinServiceUrl,
             @Value("${planning.simulate.medecin-service.down:false}") boolean simulateMedecinServiceDown
     ) {
         this.creneauRepository = creneauRepository;
+        this.medecinServiceUrl = medecinServiceUrl;
         this.simulateMedecinServiceDown = simulateMedecinServiceDown;
     }
 
@@ -215,6 +218,12 @@ public class CreneauServiceImpl implements CreneauService {
             return false;
         }
         try {
+            // Externalized URL (cloud-ready). In this TP version we only compose it to avoid hardcoding.
+            String url = medecinServiceUrl + "/" + medecinId;
+            if (url.isBlank()) {
+                throw new IllegalStateException("service.medecin.url is blank");
+            }
+
             if (simulateMedecinServiceDown) {
                 // Simulate: external service down / timeout / connection refused.
                 throw new RuntimeException("Simulated medecin-service failure");
