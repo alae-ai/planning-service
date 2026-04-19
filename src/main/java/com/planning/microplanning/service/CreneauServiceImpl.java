@@ -87,11 +87,14 @@ public class CreneauServiceImpl implements CreneauService {
             throw new IllegalArgumentException("month must be between 1 and 12");
         }
 
-        LocalDate start = LocalDate.of(year, month, 1);
-        LocalDate end = start.withDayOfMonth(start.lengthOfMonth());
-
-        Map<Long, Long> countsByMedecin = creneauRepository.findByDisponibleFalseAndDateBetween(start, end).stream()
-                .collect(Collectors.groupingBy(Creneau::getMedecinId, Collectors.counting()));
+        // Keep this reporting query simple and robust: avoid DB date functions and handle null data defensively.
+        Map<Long, Long> countsByMedecin = creneauRepository.findByDisponibleFalse().stream()
+                .filter(c -> c != null && c.getDate() != null)
+                .filter(c -> c.getDate().getYear() == year && c.getDate().getMonthValue() == month)
+                .collect(Collectors.groupingBy(
+                        c -> c.getMedecinId() == null ? 0L : c.getMedecinId(),
+                        Collectors.counting()
+                ));
 
         return countsByMedecin.entrySet().stream()
                 .map(e -> new MedecinStatsDTO(e.getKey(), e.getValue()))

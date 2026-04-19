@@ -7,7 +7,6 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.time.LocalDate;
 import java.util.List;
 
 public interface CreneauRepository extends JpaRepository<Creneau, Long> {
@@ -15,12 +14,12 @@ public interface CreneauRepository extends JpaRepository<Creneau, Long> {
 
     List<Creneau> findByDisponibleTrue();
 
+    List<Creneau> findByDisponibleFalse();
+
     // Convenience overloads so the service can keep returning slots ordered by (date, heureDebut).
     List<Creneau> findByMedecinId(Long medecinId, Sort sort);
 
     List<Creneau> findByDisponibleTrue(Sort sort);
-
-    List<Creneau> findByDisponibleFalseAndDateBetween(LocalDate start, LocalDate end);
 
     // Atomic state transitions for data consistency (handles concurrent requests correctly).
     @Modifying(clearAutomatically = true, flushAutomatically = true)
