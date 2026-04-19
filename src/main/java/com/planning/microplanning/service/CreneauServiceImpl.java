@@ -2,6 +2,7 @@ package com.planning.microplanning.service;
 
 import com.planning.microplanning.model.Creneau;
 import com.planning.microplanning.repository.CreneauRepository;
+import com.planning.microplanning.service.dto.MedecinStatsDTO;
 import com.planning.microplanning.web.error.CreneauNotFoundException;
 import com.planning.microplanning.web.error.CreneauStateException;
 import com.planning.microplanning.web.error.ExternalServiceUnavailableException;
@@ -16,15 +17,18 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 public class CreneauServiceImpl implements CreneauService {
 
     private static final Logger log = LoggerFactory.getLogger(CreneauServiceImpl.class);
     private static final Sort CRENEAU_SORT = Sort.by(Sort.Direction.ASC, "date", "heureDebut");
-    private static final LocalTime DEFAULT_HEURE_DEBUT = LocalTime.of(9, 0);
+    private static final LocalTime DEFAULT_HEURE_DEBUT = LocalTime.now();
     private static final int DEFAULT_DUREE_MINUTES = 30;
 
     private final CreneauRepository creneauRepository;
@@ -71,6 +75,27 @@ public class CreneauServiceImpl implements CreneauService {
         }
         return creneauRepository.findByMedecinId(medecinId, CRENEAU_SORT).stream()
                 .map(this::stabilizeAndPersistIfNeeded)
+                .toList();
+    }
+
+    @Override
+    public List<MedecinStatsDTO> statsCreneauxReservesParMedecin(int year, int month) {
+        if (year < 1) {
+            throw new IllegalArgumentException("year must be >= 1");
+        }
+        if (month < 1 || month > 12) {
+            throw new IllegalArgumentException("month must be between 1 and 12");
+        }
+
+        LocalDate start = LocalDate.of(year, month, 1);
+        LocalDate end = start.withDayOfMonth(start.lengthOfMonth());
+
+        Map<Long, Long> countsByMedecin = creneauRepository.findByDisponibleFalseAndDateBetween(start, end).stream()
+                .collect(Collectors.groupingBy(Creneau::getMedecinId, Collectors.counting()));
+
+        return countsByMedecin.entrySet().stream()
+                .map(e -> new MedecinStatsDTO(e.getKey(), e.getValue()))
+                .sorted(Comparator.comparing(MedecinStatsDTO::getMedecinId, Comparator.nullsLast(Long::compareTo)))
                 .toList();
     }
 

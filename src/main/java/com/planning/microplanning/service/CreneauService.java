@@ -1,6 +1,8 @@
 package com.planning.microplanning.service;
 
 import com.planning.microplanning.model.Creneau;
+import com.planning.microplanning.service.dto.MedecinStatsDTO;
+
 import java.util.List;
 
 public interface CreneauService {
@@ -11,5 +13,7 @@ public interface CreneauService {
     Creneau create(Creneau creneau);
     Creneau bloquer(Long id);
     Creneau liberer(Long id);
+
+    List<MedecinStatsDTO> statsCreneauxReservesParMedecin(int year, int month);
 }
 

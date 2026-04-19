@@ -2,8 +2,7 @@ package com.planning.microplanning.web.controller;
 
 import com.planning.microplanning.service.CreneauService;
 import com.planning.microplanning.model.Creneau;
-import com.planning.microplanning.web.error.CreneauNotFoundException;
-import com.planning.microplanning.web.error.CreneauStateException;
+import com.planning.microplanning.service.dto.MedecinStatsDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,6 +11,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
@@ -45,6 +45,11 @@ public class CreneauController {
         return creneauService.findByMedecin(medecinId);
     }
 
+    @GetMapping("/stats/medecins")
+    public List<MedecinStatsDTO> statsMedecins(@RequestParam int year, @RequestParam int month) {
+        return creneauService.statsCreneauxReservesParMedecin(year, month);
+    }
+
     @PostMapping
     public ResponseEntity<Creneau> create(@RequestBody Creneau creneau) {
         Creneau saved = creneauService.create(creneau);
@@ -68,4 +73,3 @@ public class CreneauController {
         return creneauService.liberer(id);
     }
 }
-
