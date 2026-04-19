@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Objects;
@@ -57,6 +58,9 @@ public class CreneauServiceImpl implements CreneauService {
     public List<Creneau> findDisponibles() {
         return creneauRepository.findByDisponibleTrue(CRENEAU_SORT).stream()
                 .map(this::stabilizeAndPersistIfNeeded)
+                // A slot can be returned by the repository as "available" while being expired.
+                // After self-healing it becomes unavailable, so ensure it is not exposed here.
+                .filter(Creneau::isDisponible)
                 .toList();
     }
 
@@ -121,6 +125,10 @@ public class CreneauServiceImpl implements CreneauService {
         // Consistency checks (business rules)
         Creneau c = creneauRepository.findById(id).orElseThrow(() -> new CreneauNotFoundException(id));
         c = stabilizeAndPersistIfNeeded(c);
+        // Time-based consistency rule: an expired slot can never become available again.
+        if (isExpired(c)) {
+            return c;
+        }
         if (c.isDisponible()) {
             throw new CreneauStateException("Creneau is already available (id=" + id + ").");
         }
@@ -203,7 +211,30 @@ public class CreneauServiceImpl implements CreneauService {
             changed = true;
         }
 
+        // Time-based consistency (self-healing):
+        // if a slot ended in the past, it must not be available anymore.
+        if (isExpired(creneau) && creneau.isDisponible()) {
+            creneau.setDisponible(false);
+            changed = true;
+        }
+
         return changed;
+    }
+
+    /**
+     * A creneau is considered expired if its end date/time (date + heureFin) is strictly before "now".
+     * Business rule: expired slots are always treated as unavailable.
+     */
+    private boolean isExpired(Creneau creneau) {
+        if (creneau == null) {
+            return false;
+        }
+        LocalDate date = creneau.getDate();
+        LocalTime heureFin = creneau.getHeureFin();
+        if (date == null || heureFin == null) {
+            return false;
+        }
+        return date.atTime(heureFin).isBefore(LocalDateTime.now());
     }
 
     /**
