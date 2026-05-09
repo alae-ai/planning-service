@@ -1,4 +1,4 @@
-# 🗓️ Planning Service
+# Medical Planning Microservice
 
 ![Java](https://img.shields.io/badge/Java-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-6DB33F?style=for-the-badge&logo=spring-boot&logoColor=white)
@@ -7,7 +7,7 @@
 
 A Spring Boot microservice for managing doctor consultation time slots (créneaux). Part of a larger medical planning system.
 
-## ✨ Features
+## Features
 
 - List, create, and retrieve consultation slots
 - Block and release slots (reservation management)
@@ -15,7 +15,7 @@ A Spring Boot microservice for managing doctor consultation time slots (créneau
 - Filter slots by doctor (`medecinId`)
 - Monthly statistics: reserved slots per doctor
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 planning-service/
@@ -27,7 +27,7 @@ planning-service/
     └── error/      # Global exception handler
 ```
 
-## 🔌 API Endpoints
+## API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -40,7 +40,7 @@ planning-service/
 | PUT | `/creneaux/{id}/liberer` | Release a slot |
 | GET | `/creneaux/stats/medecins?year=YYYY&month=MM` | Monthly stats |
 
-## ⚙️ Getting Started
+## Getting Started
 
 ### Prerequisites
 - Java 17+
@@ -54,14 +54,14 @@ planning-service/
 
 The service starts on `http://localhost:8080` by default.
 
-## 🧠 Business Rules
+## Business Rules
 
 - Slots in the past are automatically marked unavailable
 - Missing fields (date, times) are auto-corrected with defaults
 - Blocking/releasing uses atomic DB updates to prevent race conditions
 - Invalid `medecinId` causes the slot to be marked unavailable
 
-## ❌ Error Codes
+## Error Codes
 
 | Code | Meaning |
 |------|---------|
